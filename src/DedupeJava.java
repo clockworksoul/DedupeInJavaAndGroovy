@@ -31,23 +31,16 @@ import java.util.Map;
  * <li>-v : Verbose mode (mostly for exceptions atm).
  * </ol>
  *
- * TODO: Options to be provided for deletion:
- * <ol>
- * <li>1, 2, 3 : Index of file to keep.</li>
- * <li>XX : Delete all in group</li>
- * <li>N : None; keep all in group</li>
- * </ol>
- *
  * @author Matthew Titmus <matthew.titmus@gmail.com>
  */
 public class DedupeJava {
-
     private static final Base64.Encoder ENCODER = Base64.getEncoder();
 
     public static void main(String[] args) throws Exception {
-        File pwd = new File(".");
-        File targetDirectory = args.length > 0 ? new File(pwd, args[0]) : pwd;
+        File targetDirectory = args.length > 0 ? new File(args[0]) : new File(".");
 
+        System.out.println("TARGET: " + targetDirectory.getCanonicalPath());
+        
         if (!targetDirectory.isDirectory()) {
             System.err.println("Target must be a directory");
             System.exit(1);
@@ -55,7 +48,7 @@ public class DedupeJava {
             try {
                 DedupeJava dedupe = new DedupeJava();
                 dedupe.doDedupe(targetDirectory);
-            } catch (NoSuchAlgorithmException | IOException e) {
+            } catch (Exception e) {
                 System.err.println("An unexpected error has occured: " + e.toString());
             }
         }
@@ -72,14 +65,15 @@ public class DedupeJava {
         List<List<File>> duplicateGroups = getduplicateGroups(targetDirectory);
 
         for (List<File> group : duplicateGroups) {
-            List<File> toDelete = null;
+            List<File> toDelete = translateInput(group);
 
-            do {
+            while(null == toDelete) {
                 toDelete = translateInput(group);
-            } while (null == toDelete);
+            }
 
             for (File f : toDelete) {
                 System.out.println("Deleting: " + f.getCanonicalPath());
+                f.delete();
             }
         }
     }
@@ -91,7 +85,7 @@ public class DedupeJava {
      * @return A string representing a number, or a capital letter; or null if invalid
      */
     private List<File> translateInput(List<File> group) throws IOException {
-        System.out.println(generateQueryOutput(group));
+        System.out.print(generateQueryOutput(group));
 
         List<File> toDelete = null;
         String input = new BufferedReader(new InputStreamReader(System.in)).readLine();
@@ -101,7 +95,7 @@ public class DedupeJava {
                 int index = Integer.parseInt(input) - 1;
 
                 if (index >= 0 && index < group.size()) {
-                    toDelete = new ArrayList(group.subList(index, index));
+                    toDelete = new ArrayList(group.subList(index, index + 1));
                 }
             } else {
                 input = input.toUpperCase();
@@ -138,8 +132,19 @@ public class DedupeJava {
      *
      * @param files A {@link List} of {@link File} objects. Files are output in the order listed.
      */
-    private String generateQueryOutput(List<File> files) {
-        return "";
+    private String generateQueryOutput(List<File> files) throws IOException {
+        StringBuilder b = new StringBuilder();
+        final String GENERAL = " XX) Delete all\n N) None\n Q) Quit\n: ";
+
+        for (int i = 0; i < files.size(); i++) {
+            File f = files.get(i);
+
+            b.append(String.format(" %d) %s%n", i + 1, f.getCanonicalPath()));
+        }
+
+        b.append(GENERAL);
+
+        return b.toString();
     }
 
     /**
